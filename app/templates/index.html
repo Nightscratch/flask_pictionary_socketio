@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flask WebSocket Demo</title>
+    <script type="text/javascript">
+        var ws = new WebSocket('ws://' + location.host + '/echo');
+        
+        ws.onopen = function() {
+            console.log('WebSocket is open now.');
+        };
+
+        ws.onmessage = function(evt) {
+            console.log('Received: ' + evt.data);
+        };
+
+        function sendMsg() {
+            var inputMsg = document.querySelector('#inputMsg').value;
+            ws.send(inputMsg);
+            console.log('Sent: ' + inputMsg);
+        }
+    </script>
+</head>
+<body>
+    <h1>Flask WebSocket Demo{{online_count}}</h1>
+    <input type="text" id="inputMsg" placeholder="Input your message here...">
+    <button onclick="sendMsg()">Send Message</button>
+</body>
+</html>

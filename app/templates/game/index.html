@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}网站首页{% endblock %}
+{% block head %}
+<style type="text/css">
+    #canvas {
+        border: 1px solid black;
+    }
+
+    .cover {
+        width: 100%;
+        height: 100%;
+        background-color: #00000091;
+        width: 600px;
+        height: 400px;
+        position: absolute;
+    }
+
+    .wait-cover-text {
+        color: #ffffff;
+        font-size: 1em;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+</style>
+<script src="https://unpkg.com/socket.io-client@4.4.1/dist/socket.io.min.js"></script>
+<script>
+    // 注释 + 简化代码 By ChatGPT 3.5
+    // 定义一些变量
+    let userName = "{{ g.username }}"
+    let room = "{{ g.room }}"
+    let usersId = null
+    let answer = null
+    let isPainter = false
+    let playerNum = 0;
+
+    // 建立socket连接，连接成功后初始化游戏状态
+    const socket = io()
+    socket.on("connect", () => {
+        // 获取用户id
+        usersId = socket.id
+        // 隐藏猜测和结束按钮
+        document.getElementById('guess').hidden = true
+        document.getElementById('paint-over').hidden = true
+        // 显示用户名和房间号
+        document.getElementById('player-name').innerText = `用户名：${userName} 房间号:${room}`
+        // 获取游戏状态
+        socket.emit('game_state', showGameState)
+    });
+
+    // 显示游戏状态
+    function showGameState(data) {
+        document.getElementById('game-state').innerText = `状态：${data.state}`
+        if (data.painter == userName) {
+            // 如果是画家，隐藏猜测按钮，显示结束按钮，设置画家名称为“画家：xxx（你自己）”，并且轮到你画了
+            document.getElementById('guess').hidden = true
+            document.getElementById('painter').innerText = `画家：${data.painter}(你自己)`
+            isPainter = true
+            document.getElementById('paint-over').hidden = false
+            myTurnToDraw()
+        } else {
+            if (data.state == '绘画中...') {
+                // 第一次进来别人在绘画，所以不能参加
+                document.getElementById('cover').hidden = false
+            } else {
+                // 如果不是画家，显示猜测按钮，设置画家名称为“画家：xxx”
+                document.getElementById('guess').hidden = false
+                document.getElementById('painter').innerText = `画家：${data.painter}`
+                isPainter = false
+            }
+        }
+    }
+
+    // 监听状态改变事件
+    socket.on("state_change", (data) => {
+        document.getElementById('cover').hidden = true
+        document.getElementById('game-state').innerText = `状态：${data.state}`
+    });
+
+    // 监听在线人数改变事件
+    socket.on("update_count", (data) => {
+        playerNum = data.players.length
+        document.getElementById('player-count').innerText = `[${data.players}]人在线(${data.players.length}/4) 房主：${data.host}`
+    });
+
+    // 监听房间关闭事件
+    socket.on("close_room", () => {
+        // 提示房间已关闭，并返回首页
+        alert('房间已被关闭')
+        window.location = '/'
+    })
+
+    // 监听游戏的画家改变事件
+    socket.on("change_painter", (data) => {
+        // 清除画布
+        context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+        if (data.painter == userName) {
+            // 如果是你成为了画家，隐藏猜测按钮，显示结束按钮，设置画家名称为“画家：xxx（你自己）”，并且轮到你画了
+            document.getElementById('guess').hidden = true
+            document.getElementById('paint-over').hidden = false
+            document.getElementById('painter').innerText = `画家：${data.painter} (你自己)`
+            isPainter = true
+            myTurnToDraw()
+        } else {
+            // 如果不是你成为了画家，显示猜测按钮，设置画家名称为“画家：xxx”
+            document.getElementById('guess').hidden = false
+            document.getElementById('paint-over').hidden = true
+            document.getElementById('painter').innerText = `画家：${data.painter}`
+            isPainter = false
+        }
+    })
+
+    // 监听消息事件
+    socket.on("msg", (data) => {
+        document.getElementById('msg').innerHTML += data + '<br>'
+    })
+
+    // 结束画图
+    function changePainter() {
+        if (playerNum == 1) {
+            alert('房间只有你一个人，换不了。')
+        } else {
+            context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+            socket.emit('painter_over')
+            isPainter = false
+        }
+    }
+
+    // 轮到你画画了
+    function myTurnToDraw() {
+        // 获取答案并发送给服务器
+        answer = prompt('该你了，你要画什么')
+        socket.emit('set_answer', answer)
+        document.getElementById('painter').innerText += ` —— 你要画：${answer}`
+    }
+
+    // 猜测答案
+    function guessAnswer() {
+        // 获取猜测结果并发送给服务器，同时显示提示框
+        answer = prompt('猜啥？')
+        socket.emit('guess', answer, showGuessResult)
+    }
+
+    // 显示猜测结果
+    function showGuessResult(data) {
+        alert(data)
+    }
+</script>
+{% endblock %}
+{% block body %}
+<p id="player-count">连接中...</p>
+<p id="player-name"></p>
+<a href="/logout">退出登录</a>
+<hr>
+<p id="painter"></p>
+<p id="game-state"></p>
+<button id="paint-over" onclick="changePainter()">下一个人</button>
+<button id="guess" onclick="guessAnswer()">我要猜</button>
+<hr>
+<div id="cover" class="cover" hidden>
+    <p class="wait-cover-text">正在绘画，请等待下一局</p>
+</div>
+<canvas id="canvas" width="600" height="400"></canvas>
+<script>
+    // 获取画布并创建上下文对象
+    const canvas = document.getElementById("canvas");
+    const context = canvas.getContext("2d");
+
+    // 记录鼠标点击信息的数组
+    const clickX = [];
+    const clickY = [];
+    const clickDrag = [];
+    let isPainting = false;
+
+    // 添加鼠标点击信息
+    function addClick(x, y, dragging) {
+        clickX.push(x);
+        clickY.push(y);
+        clickDrag.push(dragging);
+    }
+
+    // 重绘画布
+    function redraw() {
+        // 清除画布
+        context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+
+        // 绘制路径
+        context.strokeStyle = "#000";
+        context.lineJoin = "round";
+        context.lineWidth = 3;
+        clickX.forEach((x, i) => {
+            context.beginPath();
+            if (clickDrag[i] && i) {
+                context.moveTo(clickX[i - 1], clickY[i - 1]);
+            } else {
+                context.moveTo(clickX[i] - 1, clickY[i]);
+            }
+            context.lineTo(clickX[i], clickY[i]);
+            context.closePath();
+            context.stroke();
+        });
+    }
+
+    // 鼠标按下事件处理函数
+    function handleMouseDown(e) {
+        if (isPainter) {
+            const mouseX = e.pageX - canvas.offsetLeft;
+            const mouseY = e.pageY - canvas.offsetTop;
+
+            isPainting = true;
+            addClick(mouseX, mouseY);
+            redraw();
+        }
+    }
+
+    // 表示路径信息的数组
+    const paths = [];
+
+    // 添加路径信息到paths数组中
+    function addPath(startX, startY, endX, endY) {
+        const path = [startX, startY, endX, endY];
+        paths.push(path);
+    }
+
+    // 鼠标移动事件处理函数
+    function handleMouseMove(e) {
+        if (isPainting) {
+            const startX = clickX[clickX.length - 1];
+            const startY = clickY[clickY.length - 1];
+            const endX = e.pageX - canvas.offsetLeft;
+            const endY = e.pageY - canvas.offsetTop;
+            addPath(startX, startY, endX, endY);
+            addClick(endX, endY, true);
+            redraw();
+        }
+    }
+
+    // 鼠标松开事件处理函数
+    function handleMouseUp() {
+        socket.emit("paint", paths)
+        paths = [];
+        isPainting = false;
+    }
+
+    // 鼠标离开事件处理函数
+    function handleMouseLeave() {
+        isPainting = false;
+    }
+
+    // 注册鼠标事件监听函数
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseup", handleMouseUp);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
+
+    // 接收新的路径信息并绘制到画布上
+    socket.on("new_paths", (data) => {
+        if (!isPainter) {
+            data.forEach(i => {
+                context.strokeStyle = "#000";
+                context.lineJoin = "round";
+                context.lineWidth = 3;
+
+                context.beginPath();
+                context.moveTo(i[0], i[1]);
+                context.lineTo(i[2], i[3]);
+                context.closePath();
+                context.stroke();
+            });
+        }
+    }); 
+</script>
+<hr>
+<p id="msg"></p>
+{% endblock %}

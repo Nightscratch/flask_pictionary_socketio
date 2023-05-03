@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>你画我猜 - {% block title %}{% endblock %}</title>
+    <script>
+        const csrf_token = "{{ g.csrf_token }}"
+    </script>
+    {% block head %}
+    {% endblock %}
+</head>
+<body>
+    <h1>你画我猜 0.1</h1>
+    <hr>
+    {% block body %}
+    {% endblock %}
+</body>
+</html>

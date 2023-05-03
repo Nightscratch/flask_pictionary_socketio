@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}网站首页{% endblock %}
+{% block head %}
+<script src="https://unpkg.com/socket.io-client@4.4.1/dist/socket.io.min.js"></script>
+<script>
+    const warn = (text)=>{
+        document.getElementById('warn').innerText = text
+    }
+
+    window.onload = () => {
+        document.getElementById('submit').addEventListener('click', () => {
+            warn('')
+            const username = document.getElementById('name').value
+            const room = document.getElementById('room').value
+
+            if (username.length >= 2 && username.length <= 10) {
+                if(room.length == 6){
+                    fetch('/set_username', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username,
+                            room,
+                            csrf_token
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if(data.code == 1){
+                            window.location = '/game'
+                        }else{
+                            warn(data.msg[Object.keys(data.msg)[0]][0])
+                        }
+                    })
+                    .catch(error => {
+                        warn('网络或服务器错误')
+                    });
+                }else{
+                    warn('房间ID只能6字数')
+                }
+            } else {
+                warn('名称只能在2-10字数')
+            }
+        })
+    }
+</script>
+{% endblock %}
+{% block body %}
+<label for="name">名称:</label>
+<input type="text" id="name" name="name" autocomplete="off">
+<label for="room">房间名:</label>
+<input type="text" id="room" name="room" autocomplete="off">
+<input type="submit" value="加入游戏" id="submit">
+<p style="color: red;" id="warn"></p>
+{% endblock %}
